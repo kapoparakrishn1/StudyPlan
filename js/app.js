@@ -2,6 +2,8 @@ import { store } from './store.js';
 import { extractTasksFromText } from './utils/api.js';
 import { initGlobalErrorBoundary } from './utils/errorBoundary.js';
 import { analyzeWorkload } from './utils/scheduler.js';
+import { formatDateTimeLocal, validateDateTime } from './utils/validation.js';
+import { DateTimePicker } from './utils/dateTimePicker.js';
 
 initGlobalErrorBoundary();
 
@@ -139,8 +141,12 @@ function renderSidebarSubjects() {
 const newTaskModal = document.getElementById('new-task-modal');
 const newTaskSubject = document.getElementById('new-task-subject');
 const newTaskTitle = document.getElementById('new-task-title');
-const newTaskDate = document.getElementById('new-task-date');
+const newTaskDatePickerEl = document.getElementById('new-task-date-picker');
 const newTaskNotes = document.getElementById('new-task-notes');
+const newTaskError = document.getElementById('new-task-error');
+
+// Custom Date-Time Picker instance for the new task modal
+let newTaskPicker = null;
 const newTaskCancel = document.getElementById('new-task-cancel');
 const newTaskSave = document.getElementById('new-task-save');
 
@@ -474,7 +480,7 @@ function renderTasks() {
           `<option value="${s.id}" ${s.id === t.subject_id ? 'selected' : ''}>${s.name}</option>`
         ).join('');
         
-        const localDate = t.due_at ? new Date(t.due_at).toISOString().substring(0, 16) : '';
+        const localDate = t.due_at ? formatDateTimeLocal(new Date(t.due_at)) : '';
         const isHighPriority = t.priority === 'high';
         
         html += `
@@ -488,7 +494,8 @@ function renderTasks() {
             <input class="board-edit-title edit-field" type="text" value="${t.title}" style="width:100%; margin-bottom: 12px; font-size:13px; font-weight:600; padding:6px; border: 1px solid var(--color-border-secondary); border-radius: 4px; background: var(--color-background-primary); color: var(--color-text-primary);">
 
             <label style="display:block; font-size:10px; font-weight:700; color:var(--color-text-tertiary); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px;">Deadline</label>
-            <input class="board-edit-date edit-field" type="datetime-local" value="${localDate}" style="width:100%; margin-bottom: 12px; font-size:12px; padding:6px; border: 1px solid var(--color-border-secondary); border-radius: 4px; background: var(--color-background-primary); color: var(--color-text-primary);">
+            <input class="board-edit-date edit-field" type="datetime-local" value="${localDate}" min="${formatDateTimeLocal()}" style="width:100%; margin-bottom: 12px; font-size:12px; padding:6px; border: 1px solid var(--color-border-secondary); border-radius: 4px; background: var(--color-background-primary); color: var(--color-text-primary);">
+            <div class="board-edit-error" style="color: var(--color-text-danger); background-color: var(--color-background-danger); border: 1px solid var(--color-border-danger); font-size: 11px; margin-bottom: 12px; display: none; border-radius: 4px; padding: 6px; box-sizing: border-box;"></div>
 
             <label style="display:block; font-size:10px; font-weight:700; color:var(--color-text-tertiary); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px;">Notes</label>
             <input class="board-edit-notes edit-field" type="text" value="${t.notes || ''}" placeholder="Notes..." style="width:100%; margin-bottom: 12px; font-size:12px; padding:6px; border: 1px solid var(--color-border-secondary); border-radius: 4px; background: var(--color-background-primary); color: var(--color-text-primary);">
@@ -606,6 +613,20 @@ function renderTasks() {
       const notes = itemEl.querySelector('.board-edit-notes').value;
       const priority = itemEl.querySelector('.board-edit-priority').value;
       
+      const errorEl = itemEl.querySelector('.board-edit-error');
+      const valResult = validateDateTime(dateVal);
+      if (!valResult.isValid) {
+        if (errorEl) {
+          errorEl.textContent = valResult.error;
+          errorEl.style.display = 'block';
+        } else {
+          alert(valResult.error);
+        }
+        return;
+      } else if (errorEl) {
+        errorEl.style.display = 'none';
+      }
+
       store.updateTask(taskId, {
         title,
         subject_id,
@@ -775,7 +796,7 @@ function renderExtraction() {
         `<option value="${s.id}" ${s.id === sub.id ? 'selected' : ''}>${s.name}</option>`
       ).join('');
       
-      const localDate = item.due_at ? new Date(item.due_at).toISOString().substring(0, 16) : '';
+      const localDate = item.due_at ? formatDateTimeLocal(new Date(item.due_at)) : '';
       
       html += `
         <div class="extract-card">
@@ -788,7 +809,8 @@ function renderExtraction() {
           <input class="edit-title-input edit-field" type="text" value="${item.title}" data-index="${index}" style="width:100%; margin-bottom: 12px; font-size:13px; font-weight:600; padding:6px; border: 1px solid var(--color-border-secondary); border-radius: 4px; background: var(--color-background-primary); color: var(--color-text-primary);">
 
           <label style="display:block; font-size:10px; font-weight:700; color:var(--color-text-tertiary); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px;">Deadline</label>
-          <input class="edit-date-input edit-field" type="datetime-local" value="${localDate}" data-index="${index}" style="width:100%; margin-bottom: 12px; font-size:12px; padding:6px; border: 1px solid var(--color-border-secondary); border-radius: 4px; background: var(--color-background-primary); color: var(--color-text-primary);">
+          <input class="edit-date-input edit-field" type="datetime-local" value="${localDate}" min="${formatDateTimeLocal()}" data-index="${index}" style="width:100%; margin-bottom: 12px; font-size:12px; padding:6px; border: 1px solid var(--color-border-secondary); border-radius: 4px; background: var(--color-background-primary); color: var(--color-text-primary);">
+          <div class="edit-date-error" style="color: var(--color-text-danger); background-color: var(--color-background-danger); border: 1px solid var(--color-border-danger); font-size: 11px; margin-bottom: 12px; display: none; border-radius: 4px; padding: 6px; box-sizing: border-box;"></div>
 
           <label style="display:block; font-size:10px; font-weight:700; color:var(--color-text-tertiary); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px;">Notes</label>
           <input class="edit-notes-input edit-field" type="text" value="${item.notes || ''}" data-index="${index}" placeholder="Notes..." style="width:100%; margin-bottom: 12px; font-size:12px; padding:6px; border: 1px solid var(--color-border-secondary); border-radius: 4px; background: var(--color-background-primary); color: var(--color-text-primary);">
@@ -836,6 +858,20 @@ function renderExtraction() {
       let dateVal = card.querySelector('.edit-date-input').value;
       const notes = card.querySelector('.edit-notes-input').value;
       
+      const errorEl = card.querySelector('.edit-date-error');
+      const valResult = validateDateTime(dateVal);
+      if (!valResult.isValid) {
+        if (errorEl) {
+          errorEl.textContent = valResult.error;
+          errorEl.style.display = 'block';
+        } else {
+          alert(valResult.error);
+        }
+        return;
+      } else if (errorEl) {
+        errorEl.style.display = 'none';
+      }
+
       const newSubject = store.subjects.find(s => s.id === subjectId);
       
       store.updateExtractedItem(idx, {
@@ -857,6 +893,79 @@ store.subscribe(renderFocusTasks);
 store.subscribe(renderSidebarSubjects);
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Dynamic min constraint updates on focus (for inline edit fields only)
+  document.addEventListener('focusin', (e) => {
+    if (e.target.classList.contains('board-edit-date') || 
+        e.target.classList.contains('edit-date-input')) {
+      e.target.min = formatDateTimeLocal();
+    }
+  });
+
+  // Initialize the custom date-time picker for the new task modal
+  if (newTaskDatePickerEl) {
+    newTaskPicker = new DateTimePicker(newTaskDatePickerEl, {
+      onChange: (val) => {
+        if (!val) {
+          if (newTaskError) newTaskError.style.display = 'none';
+          newTaskSave.disabled = false;
+          return;
+        }
+        const valResult = validateDateTime(val);
+        if (!valResult.isValid) {
+          if (newTaskError) {
+            newTaskError.textContent = valResult.error;
+            newTaskError.style.display = 'block';
+          }
+          newTaskSave.disabled = true;
+        } else {
+          if (newTaskError) newTaskError.style.display = 'none';
+          newTaskSave.disabled = false;
+        }
+      }
+    });
+  }
+
+  // Real-time validation for dynamic inline edit fields
+  const handleDynamicDateValidation = (e) => {
+    if (e.target.classList.contains('board-edit-date')) {
+      const itemEl = e.target.closest('.task-item');
+      const errorEl = itemEl.querySelector('.board-edit-error');
+      const saveBtn = itemEl.querySelector('.save-board-edit-btn');
+      const valResult = validateDateTime(e.target.value);
+      if (!valResult.isValid) {
+        if (errorEl) {
+          errorEl.textContent = valResult.error;
+          errorEl.style.display = 'block';
+        }
+        if (saveBtn) saveBtn.disabled = true;
+      } else {
+        if (errorEl) {
+          errorEl.style.display = 'none';
+        }
+        if (saveBtn) saveBtn.disabled = false;
+      }
+    } else if (e.target.classList.contains('edit-date-input')) {
+      const card = e.target.closest('.extract-card');
+      const errorEl = card.querySelector('.edit-date-error');
+      const saveBtn = card.querySelector('.save-edit-btn');
+      const valResult = validateDateTime(e.target.value);
+      if (!valResult.isValid) {
+        if (errorEl) {
+          errorEl.textContent = valResult.error;
+          errorEl.style.display = 'block';
+        }
+        if (saveBtn) saveBtn.disabled = true;
+      } else {
+        if (errorEl) {
+          errorEl.style.display = 'none';
+        }
+        if (saveBtn) saveBtn.disabled = false;
+      }
+    }
+  };
+  document.addEventListener('input', handleDynamicDateValidation);
+  document.addEventListener('change', handleDynamicDateValidation);
+
   if (newSubjectColorsEl) {
     SUBJECT_COLORS.forEach(c => {
       const btn = document.createElement('button');
@@ -984,13 +1093,24 @@ newTaskBtn.addEventListener('click', () => {
     .map(s => `<option value="${s.id}">${s.name}</option>`)
     .join('');
 
+  if (newTaskError) {
+    newTaskError.textContent = '';
+    newTaskError.style.display = 'none';
+  }
+  newTaskSave.disabled = false;
 
-  if (selectedDate) {
-    const d = new Date(selectedDate);
-    d.setHours(18, 0, 0, 0); 
-    newTaskDate.value = d.toISOString().substring(0, 16);
-  } else {
-    newTaskDate.value = '';
+  if (newTaskPicker) {
+    if (selectedDate) {
+      const d = new Date(selectedDate);
+      d.setHours(18, 0, 0, 0); 
+      if (d < new Date()) {
+        newTaskPicker.setValue(formatDateTimeLocal());
+      } else {
+        newTaskPicker.setValue(formatDateTimeLocal(d));
+      }
+    } else {
+      newTaskPicker.setValue('');
+    }
   }
 
   newTaskTitle.value = '';
@@ -1013,11 +1133,24 @@ newTaskSave.addEventListener('click', async () => {
   const title = newTaskTitle.value.trim();
   const subject_id = newTaskSubject.value;
   const notes = newTaskNotes.value.trim();
-  const dateVal = newTaskDate.value;
+  const dateVal = newTaskPicker ? newTaskPicker.getValue() : '';
 
   if (!title) {
     alert('Please enter a task name');
     return;
+  }
+
+  const valResult = validateDateTime(dateVal);
+  if (!valResult.isValid) {
+    if (newTaskError) {
+      newTaskError.textContent = valResult.error;
+      newTaskError.style.display = 'block';
+    } else {
+      alert(valResult.error);
+    }
+    return;
+  } else if (newTaskError) {
+    newTaskError.style.display = 'none';
   }
 
   const due_at = dateVal ? new Date(dateVal).toISOString() : '';
@@ -1038,6 +1171,18 @@ newTaskSave.addEventListener('click', async () => {
 
 addItemsBtn.addEventListener('click', () => {
   if (store.currentPaste) {
+    const invalidTasks = store.currentPaste.filter(t => {
+      if (!t.due_at) return true;
+      const due = new Date(t.due_at);
+      const now = new Date();
+      now.setSeconds(0, 0);
+      return due < now;
+    });
+    if (invalidTasks.length > 0) {
+      const names = invalidTasks.map(t => `"${t.title}"`).join(', ');
+      alert(`Cannot add tasks because the following task(s) have past or invalid dates: ${names}. Please edit them first.`);
+      return;
+    }
     store.addTasks(store.currentPaste);
     store.clearExtracted();
     pasteInput.value = '';
@@ -1067,6 +1212,18 @@ clearBtn.addEventListener('click', () => {
 
 addItemsBtn.addEventListener('click', () => {
   if (store.currentPaste) {
+    const invalidTasks = store.currentPaste.filter(t => {
+      if (!t.due_at) return true;
+      const due = new Date(t.due_at);
+      const now = new Date();
+      now.setSeconds(0, 0);
+      return due < now;
+    });
+    if (invalidTasks.length > 0) {
+      const names = invalidTasks.map(t => `"${t.title}"`).join(', ');
+      alert(`Cannot add tasks because the following task(s) have past or invalid dates: ${names}. Please edit them first.`);
+      return;
+    }
     store.addTasks(store.currentPaste);
     store.clearExtracted();
     pasteInput.value = '';
